@@ -1,0 +1,151 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "grpwk24.h"
+
+int enc() {
+    FILE *ofp;
+    if ((ofp = fopen(ORGDATA, "r")) == NULL) {
+        fprintf(stderr, "cannot open %s\n", ORGDATA);
+        exit(1);
+    }
+
+    FILE *efp;
+    if ((efp = fopen(ENCDATA, "w")) == NULL) {
+        fprintf(stderr, "cannot open %s\n", ENCDATA);
+        exit(1);
+    }
+
+    unsigned char c1, c2, res;
+    for (int i = 0; i < ORGDATA_LEN; i += 2) {
+        c1 = getc(ofp);
+        c2 = getc(ofp);
+
+        switch (((c1 & 0x1) << 7) >> 6 | (c2 & 0x1)) {
+            case 0:
+                res = BASE_A;
+                break;
+            case 1:
+                res = BASE_C;
+                break;
+            case 2:
+                res = BASE_G;
+                break;
+            case 3:
+                res = BASE_T;
+                break;
+        }
+        fputc(res, efp);
+    }
+    res = '\n';
+    fputc(res, efp);
+
+    fclose(ofp);
+    fclose(efp);
+    return 0;
+}
+
+int expand_repeated() {
+    FILE *efp;
+    if ((efp = fopen(ENCDATA, "r+")) == NULL) {
+        fprintf(stderr, "cannot open %s\n", ENCDATA);
+        exit(1);
+    }
+
+    char buffer[ORGDATA_LEN];
+    int len = 0;
+    int current;
+    while ((current = getc(efp)) != EOF) {
+        buffer[len++] = current;
+    }
+    rewind(efp);
+
+    int previous = EOF, count = 1;
+    for (int i = 0; i < len; i++) {
+        current = buffer[i];
+        if (current == previous) {
+            count++;
+        } else {
+            if (previous != EOF) {
+                for (int j = 0; j < count * 5; j++) {
+                    fputc(previous, efp);
+                }
+            }
+            previous = current;
+            count = 1;
+        }
+    }
+
+    if (previous != EOF) {
+        for (int j = 0; j < count * 5; j++) {
+            fputc(previous, efp);
+        }
+    }
+
+    fclose(efp);
+    return 0;
+}
+
+int insert() {
+    FILE *efp;
+    if ((efp = fopen(ENCDATA, "r+")) == NULL) {
+        fprintf(stderr, "cannot open %s\n", ENCDATA);
+        exit(1);
+    }
+
+    char buffer[ORGDATA_LEN * 5]; // データ量が増える可能性を考慮
+    int len = 0;
+    int current;
+
+    // 読み込んだ内容をバッファに保存
+    while ((current = getc(efp)) != EOF) {
+        buffer[len++] = current;
+    }
+    rewind(efp); // ファイルポインタを先頭に戻す
+
+    // 100文字ごとにACGTまたはACGAまたはTCGTを挿入しながら書き込み
+    int count = 0;
+    for (int i = 0; i < len; i++) {
+        fputc(buffer[i], efp);
+        count++;
+
+        if (count == 100) { // 100文字ごとの処理
+            // 直前の文字がAかどうかを確認
+            if (i > 0 && buffer[i - 1] == 'A') {
+                // 直前がAの場合、TCを挿入
+                fprintf(efp, "TC");
+                
+                // 挿入した後の次の文字を確認
+                if (i + 1 < len && buffer[i + 1] == 'T') {
+                    fprintf(efp, "GA"); // 次がTの場合、GAを挿入
+                } else {
+                    fprintf(efp, "GT"); // それ以外の場合、GTを挿入
+                }
+            } else {
+                // それ以外の場合、ACを挿入
+                fprintf(efp, "AC");
+
+                // 挿入後の次の文字を確認
+                if (i + 1 < len && buffer[i + 1] == 'T') {
+                    fprintf(efp, "GA"); // 次がTの場合、GAを挿入
+                } else {
+                    fprintf(efp, "GT"); // それ以外の場合、GTを挿入
+                }
+            }
+
+            count = 0;
+        }
+    }
+
+    fclose(efp);
+    return 0;
+}
+
+
+
+int main() {
+    enc();
+    expand_repeated();
+    insert(); // 修正された関数を呼び出し
+    return 0;
+}
