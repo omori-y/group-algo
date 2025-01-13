@@ -109,7 +109,7 @@ int insert() {
         fputc(buffer[i], efp);
         count++;
 
-        if (count == 100) { // 100文字ごとの処理
+        if (count == 1000){ 
             // 直前の文字がAかどうかを確認
             if (i > 0 && buffer[i - 1] == 'A') {
                 // 直前がAの場合、TCを挿入
