@@ -1,0 +1,203 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "grpwk24.h"
+
+#define PROCESS_SEQDATA "PROCESS_SEQDATA"
+
+// 文字列の長さ調整（100000文字にする）
+void adjust_100000_letters(char *str) {
+    int len = strlen(str);
+    if (len < 100000) {
+        while (len < 100000) {
+            str[len++] = 'A';
+        }
+        str[len] = '\0';
+    } else if (len > 100000) {
+        str[100000] = '\0';
+    }
+}
+
+void adjust_letters(char *str) {
+    int len = strlen(str);
+    int n = 20;
+
+    
+    if (len < n) {
+        while (len < n) {
+            str[len++] = 'A'; // 'A'で埋める
+        }
+        str[len] = '\0'; // 終端文字を追加
+    } else if (len >= n) {
+        str[n] = '\0'; // 20文字目までに切り捨てる
+    }
+}
+// 文字列の長さを元に戻す
+void restore_lengths(char *str) {
+    int len = strlen(str);
+    int i, j = 0;
+    for (i = 0; i < len; i++) {
+        int count = 1;
+        while (i + 1 < len && str[i] == str[i + 1]) {
+            count++;
+            i++;
+        }
+        int n = count / 5;
+        int remainder = count % 5;
+        if (remainder == 3 || remainder == 4) {
+            n++;
+        }
+        for (int k = 0; k < n; k++) {
+            str[j++] = str[i];
+        }
+    }
+    str[j] = '\0';
+}
+
+// SEQDATAの内容を処理する関数
+int process_seqdata() {
+    FILE *sfp;
+    if ((sfp = fopen(SEQDATA, "r")) == NULL) {
+        perror("Error opening SEQDATA");
+        return -1;
+    }
+
+    fseek(sfp, 0, SEEK_END);
+    long file_size = ftell(sfp);
+    fseek(sfp, 0, SEEK_SET);
+    if (file_size == 0) {
+        fprintf(stderr, "SEQDATA is empty.\n");
+        fclose(sfp);
+        return -1;
+    }
+
+    char *seqdata = (char *)malloc(file_size + 1);
+    if (seqdata == NULL) {
+        perror("Memory allocation failed");
+        fclose(sfp);
+        return -1;
+    }
+
+    fread(seqdata, 1, file_size, sfp);
+    seqdata[file_size] = '\0';
+    fclose(sfp);
+
+    char *seqdata_copy = strdup(seqdata);
+    if (seqdata_copy == NULL) {
+        perror("Memory allocation failed");
+        free(seqdata);
+        return -1;
+    }
+
+    int detect_allowed_indices[100000], detect_indices[100000];
+    int detect_count = 0, detect_idx = 0, allowed_idx = 0;
+    detect_allowed_indices[allowed_idx++] = 0;
+
+    int n = strlen(seqdata_copy);
+    int can_detect = 1;
+
+    for (int i = 1; i < n - 1; i++) {
+        if (seqdata_copy[i - 1] != seqdata_copy[i] && seqdata_copy[i + 1] != seqdata_copy[i]) {
+            if (can_detect) {
+                detect_count++;
+                detect_indices[detect_idx++] = i;
+                can_detect = 0;
+            }
+        } else {
+            if (!can_detect) {
+                can_detect = 1;
+                detect_allowed_indices[allowed_idx++] = i;
+            }
+        }
+    }
+
+    FILE *file_append = fopen(PROCESS_SEQDATA, "w");
+    if (file_append == NULL) {
+        perror("Error opening PROCESS_SEQDATA");
+        free(seqdata);
+        free(seqdata_copy);
+        return -1;
+    }
+
+    char result[1000000] = "";
+    for (int i = 0; i < detect_count; i++) {
+        int start_idx = detect_allowed_indices[i];
+        int end_idx = detect_indices[i];
+        char temp[100000];
+        strncpy(temp, &seqdata_copy[start_idx], end_idx - start_idx + 1);
+        temp[end_idx - start_idx + 1] = '\0';
+        restore_lengths(temp);
+        adjust_letters(temp);
+        strcat(result, temp);
+    }
+
+    adjust_100000_letters(result);
+    fprintf(file_append, "%s", result);
+
+    fclose(file_append);
+
+    free(seqdata);
+    free(seqdata_copy);
+
+    return 0;
+}
+
+// SEQDATAファイルをDECDATAファイルに変換する関数
+int dec() {
+    FILE *sfp;
+    if ((sfp = fopen(PROCESS_SEQDATA, "r")) == NULL) {
+        fprintf(stderr, "Cannot open %s\n", PROCESS_SEQDATA);
+        exit(1);
+    }
+
+    FILE *dfp;
+    if ((dfp = fopen(DECDATA, "w")) == NULL) {
+        fprintf(stderr, "Cannot open %s\n", DECDATA);
+        fclose(sfp);
+        exit(1);
+    }
+
+    unsigned char c, res;
+    while ((c = getc(sfp)) != EOF) {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\0') {
+            break;
+        }
+
+        switch (c) {
+        case BASE_A:
+            res = 0;
+            break;
+        case BASE_C:
+            res = 1;
+            break;
+        case BASE_G:
+            res = 2;
+            break;
+        case BASE_T:
+            res = 3;
+            break;
+        default:
+            fprintf(stderr, "Invalid character encountered: %c\n", c);
+            fclose(sfp);
+            fclose(dfp);
+            exit(1);
+        }
+        fputc((res >> 1) + '0', dfp);
+        fputc((res & 0x1) + '0', dfp);
+    }
+
+    fputc('\n', dfp);
+    fclose(sfp);
+    fclose(dfp);
+    return 0;
+}
+
+int main() {
+    // 1. SEQDATAを処理
+    process_seqdata();
+
+    // 2. SEQDATAをDECDATAに変換
+    dec();
+
+    return 0;
+}
