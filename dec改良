@@ -5,7 +5,6 @@
 
 #define PROCESS_SEQDATA "PROCESS_SEQDATA"
 
-// 文字列の長さ調整（100000文字にする）
 void adjust_100000_letters(char *str) {
     int len = strlen(str);
     if (len < 100000) {
@@ -20,9 +19,7 @@ void adjust_100000_letters(char *str) {
 
 void adjust_letters(char *str) {
     int len = strlen(str);
-    int n = 20;
-
-    
+    int n = 200;
     if (len < n) {
         while (len < n) {
             str[len++] = 'A'; // 'A'で埋める
@@ -32,7 +29,7 @@ void adjust_letters(char *str) {
         str[n] = '\0'; // 20文字目までに切り捨てる
     }
 }
-// 文字列の長さを元に戻す
+
 void restore_lengths(char *str) {
     int len = strlen(str);
     int i, j = 0;
@@ -54,7 +51,6 @@ void restore_lengths(char *str) {
     str[j] = '\0';
 }
 
-// SEQDATAの内容を処理する関数
 int process_seqdata() {
     FILE *sfp;
     if ((sfp = fopen(SEQDATA, "r")) == NULL) {
@@ -142,25 +138,26 @@ int process_seqdata() {
     return 0;
 }
 
-// SEQDATAファイルをDECDATAファイルに変換する関数
+
+
 int dec() {
     FILE *sfp;
     if ((sfp = fopen(PROCESS_SEQDATA, "r")) == NULL) {
-        fprintf(stderr, "Cannot open %s\n", PROCESS_SEQDATA);
+        fprintf(stderr, "cannot open %s\n", PROCESS_SEQDATA);
         exit(1);
     }
 
     FILE *dfp;
     if ((dfp = fopen(DECDATA, "w")) == NULL) {
-        fprintf(stderr, "Cannot open %s\n", DECDATA);
-        fclose(sfp);
+        fprintf(stderr, "cannot open %s\n", DECDATA);
         exit(1);
     }
 
     unsigned char c, res;
-    while ((c = getc(sfp)) != EOF) {
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\0') {
-            break;
+    int count = 0; // カウンターを初期化
+    while ((c = fgetc(sfp)) != EOF && count < 100000) { // 最初の100,000文字だけを処理するための条件
+        if (c == ' ' || c == '\n') { // 空白または改行に達した場合、ループを抜ける
+            continue;
         }
 
         switch (c) {
@@ -177,27 +174,33 @@ int dec() {
             res = 3;
             break;
         default:
-            fprintf(stderr, "Invalid character encountered: %c\n", c);
-            fclose(sfp);
-            fclose(dfp);
-            exit(1);
+            res = 0; // 該当しない場合は0を代入
+            continue; // 該当しない文字は無視
         }
-        fputc((res >> 1) + '0', dfp);
-        fputc((res & 0x1) + '0', dfp);
+        fputc((res >> 1) + '0', dfp); // 最上位ビットを文字に変換して書き込み
+        fputc((res & 1) + '0', dfp); // 最下位ビットを文字に変換して書き込み
+        count++; // カウンターをインクリメント
     }
 
-    fputc('\n', dfp);
+    fputc('\n', dfp); // 最後に改行を追加してファイルを整形
+
     fclose(sfp);
     fclose(dfp);
     return 0;
 }
 
-int main() {
-    // 1. SEQDATAを処理
-    process_seqdata();
 
-    // 2. SEQDATAをDECDATAに変換
-    dec();
+int main() {
+    int result = process_seqdata();
+    if (result != 0) {
+        return result;
+    }
+
+
+    result = dec();
+    if (result != 0) {
+        return result;
+    }
 
     return 0;
 }
