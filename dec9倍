@@ -1,0 +1,209 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "grpwk24.h"
+
+#define PROCESS_SEQDATA "PROCESS_SEQDATA"
+
+void adjust_100000_letters(char *str) {
+    int len = strlen(str);
+    if (len < 100000) {
+        while (len < 100000) {
+            str[len++] = 'A';
+        }
+        str[len] = '\0';
+    } else if (len > 100000) {
+        str[100000] = '\0';
+    }
+}
+
+void adjust_letters(char *str) {
+    int len = strlen(str);
+    int n = 200;
+    if (len < n) {
+        while (len < n) {
+            str[len++] = 'A'; // 'A'で埋める
+        }
+        str[len] = '\0'; // 終端文字を追加
+    } else if (len >= n) {
+        str[n] = '\0'; // 20文字目までに切り捨てる
+    }
+}
+
+void restore_lengths(char *str) {
+    int len = strlen(str);
+    int i, j = 0;
+    for (i = 0; i < len; i++) {
+        int count = 1;
+        while (i + 1 < len && str[i] == str[i + 1]) {
+            count++;
+            i++;
+        }
+        int n = count / 9;
+        int remainder = count % 9;
+        if ( remainder == 5 || remainder == 6 || remainder == 7||remainder == 8) {
+            n++;
+        }
+        for (int k = 0; k < n; k++) {
+            str[j++] = str[i];
+        }
+    }
+    str[j] = '\0';
+}
+
+int process_seqdata() {
+    FILE *sfp;
+    if ((sfp = fopen(SEQDATA, "r")) == NULL) {
+        perror("Error opening SEQDATA");
+        return -1;
+    }
+
+    fseek(sfp, 0, SEEK_END);
+    long file_size = ftell(sfp);
+    fseek(sfp, 0, SEEK_SET);
+    if (file_size == 0) {
+        fprintf(stderr, "SEQDATA is empty.\n");
+        fclose(sfp);
+        return -1;
+    }
+
+    char *seqdata = (char *)malloc(file_size + 1);
+    if (seqdata == NULL) {
+        perror("Memory allocation failed");
+        fclose(sfp);
+        return -1;
+    }
+
+    fread(seqdata, 1, file_size, sfp);
+    seqdata[file_size] = '\0';
+    fclose(sfp);
+
+    char *seqdata_copy = strdup(seqdata);
+    if (seqdata_copy == NULL) {
+        perror("Memory allocation failed");
+        free(seqdata);
+        return -1;
+    }
+
+    int detect_allowed_indices[100000], detect_indices[100000];
+    int detect_count = 0, detect_idx = 0, allowed_idx = 0;
+    detect_allowed_indices[allowed_idx++] = 0;
+
+    int n = strlen(seqdata_copy);
+    int can_detect = 1;
+
+    for (int i = 1; i < n - 1; i++) {
+        if (seqdata_copy[i - 1] != seqdata_copy[i] && seqdata_copy[i + 1] != seqdata_copy[i]) {
+            if (can_detect) {
+                detect_count++;
+                detect_indices[detect_idx++] = i;
+                can_detect = 0;
+            }
+        } else {
+            if (!can_detect) {
+                can_detect = 1;
+                detect_allowed_indices[allowed_idx++] = i;
+            }
+        }
+    }
+
+    FILE *file_append = fopen(PROCESS_SEQDATA, "w");
+    if (file_append == NULL) {
+        perror("Error opening PROCESS_SEQDATA");
+        free(seqdata);
+        free(seqdata_copy);
+        return -1;
+    }
+
+    char result[1000000] = "";
+    for (int i = 0; i < detect_count; i++) {
+        int start_idx = detect_allowed_indices[i];
+        int end_idx = detect_indices[i];
+        char temp[100000];
+        strncpy(temp, &seqdata_copy[start_idx], end_idx - start_idx + 1);
+        temp[end_idx - start_idx + 1] = '\0';
+        restore_lengths(temp);
+        adjust_letters(temp);
+        strcat(result, temp);
+    }
+
+    adjust_100000_letters(result);
+    fprintf(file_append, "%s", result);
+
+    fclose(file_append);
+
+    free(seqdata);
+    free(seqdata_copy);
+
+    // detect_countを整数として出力
+    printf("Detect count: %d\n", detect_count);
+
+    return 0;
+}
+
+
+int dec() {
+    FILE *sfp;
+    if ((sfp = fopen(PROCESS_SEQDATA, "r")) == NULL) {
+        fprintf(stderr, "cannot open %s\n", PROCESS_SEQDATA);
+        exit(1);
+    }
+
+    FILE *dfp;
+    if ((dfp = fopen(DECDATA, "w")) == NULL) {
+        fprintf(stderr, "cannot open %s\n", DECDATA);
+        exit(1);
+    }
+
+    unsigned char c, res;
+    int count = 0; // カウンターを初期化
+    while ((c = fgetc(sfp)) != EOF && count < 100000) { // 最初の100,000文字だけを処理するための条件
+        if (c == ' ' || c == '\n') { // 空白または改行に達した場合、ループを抜ける
+            continue;
+        }
+
+        switch (c) {
+        case BASE_A:
+            res = 0;
+            break;
+        case BASE_C:
+            res = 1;
+            break;
+        case BASE_G:
+            res = 2;
+            break;
+        case BASE_T:
+            res = 3;
+            break;
+        default:
+            res = 0; // 該当しない場合は0を代入
+            continue; // 該当しない文字は無視
+        }
+        fputc((res >> 1) + '0', dfp); // 最上位ビットを文字に変換して書き込み
+        fputc((res & 1) + '0', dfp); // 最下位ビットを文字に変換して書き込み
+        count++; // カウンターをインクリメント
+    }
+
+    fputc('\n', dfp); // 最後に改行を追加してファイルを整形
+
+    fclose(sfp);
+    fclose(dfp);
+    return 0;
+}
+
+
+int main() {
+    int result = process_seqdata();
+    if (result != 0) {
+        return result;
+    }
+
+
+    result = dec();
+    if (result != 0) {
+        return result;
+    }
+    
+
+    return 0;
+}
