@@ -22,15 +22,16 @@ void adjust_letters(char *str) {
     int n = 200;
     if (len < n) {
         while (len < n) {
-            str[len++] = 'A'; // 'A'で埋める
+            str[len++] = 'A';
         }
-        str[len] = '\0'; // 終端文字を追加
+        str[len] = '\0'; 
     } else if (len >= n) {
-        str[n] = '\0'; // 20文字目までに切り捨てる
+        str[n] = '\0'; 
     }
 }
 
 void restore_lengths(char *str) {
+  int d = 9;
     int len = strlen(str);
     int i, j = 0;
     for (i = 0; i < len; i++) {
@@ -39,9 +40,9 @@ void restore_lengths(char *str) {
             count++;
             i++;
         }
-        int n = count / 5;
-        int remainder = count % 5;
-        if (remainder == 3 || remainder == 4) {
+        int n = count / d;
+        int remainder = count % d;
+        if (  remainder == 5 || remainder == 6 || remainder == 7 || remainder == 8) {
             n++;
         }
         for (int k = 0; k < n; k++) {
@@ -92,6 +93,7 @@ int process_seqdata() {
     int n = strlen(seqdata_copy);
     int can_detect = 1;
 
+    
     for (int i = 1; i < n - 1; i++) {
         if (seqdata_copy[i - 1] != seqdata_copy[i] && seqdata_copy[i + 1] != seqdata_copy[i]) {
             if (can_detect) {
@@ -122,7 +124,16 @@ int process_seqdata() {
         char temp[100000];
         strncpy(temp, &seqdata_copy[start_idx], end_idx - start_idx + 1);
         temp[end_idx - start_idx + 1] = '\0';
+        
+        
         restore_lengths(temp);
+        
+       
+        if (strlen(temp) <= 100) {
+            continue;
+        }
+
+       
         adjust_letters(temp);
         strcat(result, temp);
     }
@@ -134,6 +145,9 @@ int process_seqdata() {
 
     free(seqdata);
     free(seqdata_copy);
+
+    
+    printf("Detect count: %d\n", detect_count);
 
     return 0;
 }
@@ -154,9 +168,9 @@ int dec() {
     }
 
     unsigned char c, res;
-    int count = 0; // カウンターを初期化
-    while ((c = fgetc(sfp)) != EOF && count < 100000) { // 最初の100,000文字だけを処理するための条件
-        if (c == ' ' || c == '\n') { // 空白または改行に達した場合、ループを抜ける
+    int count = 0; 
+    while ((c = fgetc(sfp)) != EOF && count < 100000) { 
+        if (c == ' ' || c == '\n') {
             continue;
         }
 
@@ -174,15 +188,15 @@ int dec() {
             res = 3;
             break;
         default:
-            res = 0; // 該当しない場合は0を代入
-            continue; // 該当しない文字は無視
+            res = 0; 
+            continue; 
         }
-        fputc((res >> 1) + '0', dfp); // 最上位ビットを文字に変換して書き込み
-        fputc((res & 1) + '0', dfp); // 最下位ビットを文字に変換して書き込み
-        count++; // カウンターをインクリメント
+        fputc((res >> 1) + '0', dfp); 
+        fputc((res & 1) + '0', dfp); 
+        count++; 
     }
 
-    fputc('\n', dfp); // 最後に改行を追加してファイルを整形
+    fputc('\n', dfp); 
 
     fclose(sfp);
     fclose(dfp);
@@ -201,6 +215,7 @@ int main() {
     if (result != 0) {
         return result;
     }
+    
 
     return 0;
 }
