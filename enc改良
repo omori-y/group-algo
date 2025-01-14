@@ -47,6 +47,7 @@ int enc() {
 
 int expand_repeated() {
     FILE *efp;
+    int n = 9;
     if ((efp = fopen(ENCDATA, "r+")) == NULL) {
         fprintf(stderr, "cannot open %s\n", ENCDATA);
         exit(1);
@@ -67,7 +68,7 @@ int expand_repeated() {
             count++;
         } else {
             if (previous != EOF) {
-                for (int j = 0; j < count * 5; j++) {
+                for (int j = 0; j < count * n; j++) {
                     fputc(previous, efp);
                 }
             }
@@ -77,7 +78,7 @@ int expand_repeated() {
     }
 
     if (previous != EOF) {
-        for (int j = 0; j < count * 5; j++) {
+        for (int j = 0; j < count * n; j++) {
             fputc(previous, efp);
         }
     }
@@ -87,49 +88,50 @@ int expand_repeated() {
 }
 
 int insert() {
+  
     FILE *efp;
     if ((efp = fopen(ENCDATA, "r+")) == NULL) {
         fprintf(stderr, "cannot open %s\n", ENCDATA);
         exit(1);
     }
 
-    char buffer[ORGDATA_LEN * 5]; // データ量が増える可能性を考慮
+    char buffer[ORGDATA_LEN * 5]; 
     int len = 0;
     int current;
 
-    // 読み込んだ内容をバッファに保存
+    
     while ((current = getc(efp)) != EOF) {
         buffer[len++] = current;
     }
-    rewind(efp); // ファイルポインタを先頭に戻す
+    rewind(efp); 
 
-    // 100文字ごとにACGTまたはACGAまたはTCGTを挿入しながら書き込み
+    
     int count = 0;
     for (int i = 0; i < len; i++) {
         fputc(buffer[i], efp);
         count++;
 
-        if (count == 1000){ 
-            // 直前の文字がAかどうかを確認
+        if (count == 1800){ 
+            
             if (i > 0 && buffer[i - 1] == 'A') {
-                // 直前がAの場合、TCを挿入
+                
                 fprintf(efp, "TC");
                 
-                // 挿入した後の次の文字を確認
+                
                 if (i + 1 < len && buffer[i + 1] == 'T') {
-                    fprintf(efp, "GA"); // 次がTの場合、GAを挿入
+                    fprintf(efp, "GA"); 
                 } else {
-                    fprintf(efp, "GT"); // それ以外の場合、GTを挿入
+                    fprintf(efp, "GT"); 
                 }
             } else {
-                // それ以外の場合、ACを挿入
+                
                 fprintf(efp, "AC");
 
-                // 挿入後の次の文字を確認
+              
                 if (i + 1 < len && buffer[i + 1] == 'T') {
-                    fprintf(efp, "GA"); // 次がTの場合、GAを挿入
+                    fprintf(efp, "GA"); 
                 } else {
-                    fprintf(efp, "GT"); // それ以外の場合、GTを挿入
+                    fprintf(efp, "GT"); 
                 }
             }
 
@@ -146,6 +148,6 @@ int insert() {
 int main() {
     enc();
     expand_repeated();
-    insert(); // 修正された関数を呼び出し
+    insert(); 
     return 0;
 }
